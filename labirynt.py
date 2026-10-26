@@ -1,193 +1,233 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import sys
 import time
 import os
 from collections import deque
 
-COLOR_DEFAULT = "\033[0m"
-COLOR_START = "\033[1;31m"   
-COLOR_VISITED = "\033[1;32m" 
-COLOR_QUEUE = "\033[1;33m"   
-COLOR_END = "\033[1;34m"     
+if os.name == 'nt':
+    os.system('')
 
-MOVES_MAP = {
-    '+': [(-1, 0), (1, 0), (0, 1), (0, -1)], 
-    '│': [(-1, 0), (1, 0)],                   
-    '─': [(0, 1), (0, -1)],                  
-    ' ': [],                                 
-    '┐': [(1, 0), (0, -1)],                  
-    '┘': [(-1, 0), (0, -1)],                 
-    '└': [(-1, 0), (0, 1)],                  
-    '┌': [(1, 0), (0, 1)],                   
-    '├': [(-1, 0), (1, 0), (0, -1)],          
-    '┴': [(-1, 0), (0, 1), (0, -1)],          
-    '┤': [(-1, 0), (1, 0), (0, 1)],          
-    '┬': [(1, 0), (0, 1), (0, -1)],          
-    '╵': [(-1, 0)],                          
-    '╹': [(1, 0)],                           
-    '╶': [(0, -1)],                          
-    '╴': [(0, 1)]                            
+COLOR_RED = "\033[1;31m"      
+COLOR_GREEN = "\033[1;32m"    
+COLOR_YELLOW = "\033[1;33m"   
+COLOR_BLUE = "\033[1;34m"     
+COLOR_RESET = "\033[0m"       
+
+CHAR_DIRECTIONS = {
+    '+': ['UP', 'DOWN', 'LEFT', 'RIGHT'],
+    '┼': ['UP', 'DOWN', 'LEFT', 'RIGHT'],
+    '|': ['UP', 'DOWN'],
+    '│': ['UP', 'DOWN'],
+    '-': ['LEFT', 'RIGHT'],
+    '─': ['LEFT', 'RIGHT'],
+    ' ': [],
+    '┌': ['DOWN', 'RIGHT'],
+    '┐': ['DOWN', 'LEFT'],
+    '└': ['UP', 'RIGHT'],
+    '┘': ['UP', 'LEFT'],
+    '├': ['UP', 'DOWN', 'RIGHT'],
+    '┤': ['UP', 'DOWN', 'LEFT'],
+    '┬': ['DOWN', 'LEFT', 'RIGHT'],
+    '┴': ['UP', 'LEFT', 'RIGHT'],
+    '╷': ['UP'],
+    '╵': ['DOWN'],
+    '╴': ['LEFT'],
+    '╶': ['RIGHT'],
 }
 
-def load_map(filepath):
-    if not os.path.exists(filepath):
-        print(f"Błąd: Plik {filepath} nie istnieje.")
-        sys.exit(1)
-    
-    with open(filepath, 'r', encoding='utf-8') as f:
-        lines = [line.rstrip('\n\r') for line in f.readlines()]
-    
-    if not lines:
-        print("Błąd: Mapa jest pusta.")
-        sys.exit(1)
-        
-    max_len = max(len(line) for line in lines)
-    grid = [list(line.ljust(max_len, ' ')) for line in lines]
-    return grid
+def get_allowed_moves(char):
+    return CHAR_DIRECTIONS.get(char, ['UP', 'DOWN', 'LEFT', 'RIGHT'])
 
-def print_map(grid, start, end, visited, queue_set):
-    os.system('cls' if os.name == 'nt' else 'clear')
+def can_move(grid, r1, c1, r2, c2):
+    rows = len(grid)
+    cols = len(grid[0])
+    if not (0 <= r2 < rows and 0 <= c2 < cols):
+        return False
+    
+    char1 = grid[r1][c1]
+    char2 = grid[r2][c2]
+    
+    dr = r2 - r1
+    dc = c2 - c1
+    
+    dir1 = None
+    if dr == -1: dir1 = 'UP'
+    elif dr == 1: dir1 = 'DOWN'
+    elif dc == -1: dir1 = 'LEFT'
+    elif dc == 1: dir1 = 'RIGHT'
+    
+    dir2 = None
+    if dr == 1: dir2 = 'UP'
+    elif dr == -1: dir2 = 'DOWN'
+    elif dc == 1: dir2 = 'LEFT'
+    elif dc == -1: dir2 = 'RIGHT'
+    
+    moves1 = get_allowed_moves(char1)
+    moves2 = get_allowed_moves(char2)
+    
+    return (dir1 in moves1) and (dir2 in moves2)
+
+def print_map(grid, start, end, visited, queue_set, current=None):
     rows = len(grid)
     cols = len(grid[0])
     
-    print("    " + "".join(str(c % 10) for c in range(cols)))
-    print("   +" + "-" * cols + "+")
+    frame_lines = ["\033[H"]
     
     for r in range(rows):
-        row_str = f"{r:2d} |"
+        line_str = ""
         for c in range(cols):
             char = grid[r][c]
             pos = (r, c)
             
             if pos == start:
-                row_str += f"{COLOR_START}{char}{COLOR_DEFAULT}"
+                line_str += f"{COLOR_RED}{char}{COLOR_RESET}"
             elif pos == end:
-                row_str += f"{COLOR_END}{char}{COLOR_DEFAULT}"
+                line_str += f"{COLOR_BLUE}{char}{COLOR_RESET}"
+            elif pos == current:
+                line_str += f"{COLOR_YELLOW}{char}{COLOR_RESET}"
             elif pos in visited:
-                row_str += f"{COLOR_VISITED}{char}{COLOR_DEFAULT}"
+                line_str += f"{COLOR_GREEN}{char}{COLOR_RESET}"
             elif pos in queue_set:
-                row_str += f"{COLOR_QUEUE}{char}{COLOR_DEFAULT}"
+                line_str += f"{COLOR_YELLOW}{char}{COLOR_RESET}"
             else:
-                row_str += f"{COLOR_DEFAULT}{char}"
-        row_str += "|"
-        print(row_str)
-    print("   +" + "-" * cols + "+")
-
-def is_valid_move(grid, r, c, nr, nc):
-    rows = len(grid)
-    cols = len(grid[0])
-    if not (0 <= nr < rows and 0 <= nc < cols):
-        return False
-    
-    char_curr = grid[r][c]
-    char_next = grid[nr][nc]
-    dr = nr - r
-    dc = nc - c
-    
-    if (dr, dc) not in MOVES_MAP.get(char_curr, []):
-        return False
-    if (-dr, -dc) not in MOVES_MAP.get(char_next, []):
-        return False
+                line_str += char
+        frame_lines.append(line_str)
         
-    return True
+    sys.stdout.write("\n".join(frame_lines) + "\n")
+    sys.stdout.flush()
+    time.sleep(0.04)
 
-def solve_maze(grid, start, end, algorithm):
+def print_grid_with_axes(grid):
     rows = len(grid)
     cols = len(grid[0])
     
-    if not (0 <= start[0] < rows and 0 <= start[1] < cols) or grid[start[0]][start[1]] == ' ':
-        print("Błąd: Nieprawidłowe lub niedostępne pole startowe.")
-        return None, 0
-    if not (0 <= end[0] < rows and 0 <= end[1] < cols) or grid[end[0]][end[1]] == ' ':
-        print("Błąd: Nieprawidłowe lub niedostępne pole końcowe.")
-        return None, 0
-
-    visited = set()
-    parent = {start: None}
+    tens_row = "      "
+    units_row = "      "
+    for c in range(cols):
+        tens_row += str(c // 10) if c >= 10 else " "
+        units_row += str(c % 10)
     
+    print(tens_row)
+    print(units_row)
+    print("      " + "-" * cols)
+    
+    for r in range(rows):
+        row_str = "".join(grid[r])
+        print(f"{r:3d} | {row_str}")
+
+def solve_maze(grid, start, end, algorithm='BFS'):
     if algorithm == 'BFS':
-        container = deque([start]) 
+        frontier = deque([start])
     else:
-        container = [start]        
+        frontier = [start]
         
+    came_from = {start: None}
+    visited = set()
     queue_set = {start}
-    steps_count = 0
     
-    while container:
+    found = False
+    steps = 0
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    
+    print("\033[2J\033[H", end="")
+    
+    while frontier:
         if algorithm == 'BFS':
-            current = container.popleft()
+            current = frontier.popleft()
         else:
-            current = container.pop()
+            current = frontier.pop()
             
-        queue_set.remove(current)
-            
+        queue_set.discard(current)
+        
         if current in visited:
             continue
             
         visited.add(current)
-        steps_count += 1
+        steps += 1
         
-        print_map(grid, start, end, visited, queue_set)
-        time.sleep(0.1)
+        print_map(grid, start, end, visited, queue_set, current)
         
         if current == end:
-            path = []
-            curr = end
-            while curr is not None:
-                path.append(curr)
-                curr = parent.get(curr)
-            path.reverse()
-            return path, steps_count
+            found = True
+            break
             
         r, c = current
-        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        for dr, dc in directions:
             nr, nc = r + dr, c + dc
-            neighbor = (nr, nc)
+            next_pos = (nr, nc)
             
-            if is_valid_move(grid, r, c, nr, nc):
-                if neighbor not in visited and neighbor not in queue_set:
-                    parent[neighbor] = current
-                    container.append(neighbor)
-                    queue_set.add(neighbor)
+            if can_move(grid, r, c, nr, nc):
+                if next_pos not in visited and next_pos not in queue_set:
+                    came_from[next_pos] = current
+                    frontier.append(next_pos)
+                    queue_set.add(next_pos)
                     
-    return None, steps_count
+    path = []
+    if found:
+        curr = end
+        while curr is not None:
+            path.append(curr)
+            curr = came_from.get(curr)
+        path.reverse()
+        
+    return found, steps, path
 
 def main():
     if len(sys.argv) < 2:
-        print("Użycie: python labirynt.py <ścieżka_do_mapy>")
+        print("Użycie: python maze_solver.py <sciezka_do_mapy>")
         sys.exit(1)
         
-    filepath = sys.argv[1]
-    grid = load_map(filepath)
-    
-    print(f"Wczytano mapę o rozmiarze: {len(grid)} wierszy x {len(grid[0])} kolumn.")
-    
+    file_path = sys.argv[1]
     try:
-        start_r = int(input("Podaj wiersz startowy: "))
-        start_c = int(input("Podaj kolumnę startową: "))
-        end_r = int(input("Podaj wiersz końcowy: "))
-        end_c = int(input("Podaj kolumnę końcową: "))
-        algorithm = input("Podaj rodzaj algorytmu (BFS / DFS): ").strip().upper()
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"Błąd odczytu pliku: {e}")
+        sys.exit(1)
         
-        if algorithm not in ['BFS', 'DFS']:
-            print("Nieznany algorytm. Wybierz BFS lub DFS.")
-            sys.exit(1)
+    grid = [list(line.rstrip('\r\n')) for line in lines]
+    max_cols = max(len(row) for row in grid)
+    for row in grid:
+        if len(row) < max_cols:
+            row.extend([' '] * (max_cols - len(row)))
             
+    print(f"Wczytano mapę: {len(grid)} wierszy, {max_cols} kolumn.\n")
+    print("Podgląd mapy początkowej z osiami współrzędnych:")
+    print_grid_with_axes(grid)
+    print()
+        
+    try:
+        print("Wprowadź współrzędne w formacie (wiersz, kolumna), numerowane od 0.")
+        start_r = int(input("Wiersz startowy: "))
+        start_c = int(input("Kolumna startowa: "))
+        end_r = int(input("Wiersz końcowy: "))
+        end_c = int(input("Kolumna końcowa: "))
+        algo = input("Wybierz algorytm [BFS / DFS]: ").strip().upper()
+        if algo not in ['BFS', 'DFS']:
+            algo = 'BFS'
     except ValueError:
-        print("Błąd: Współrzędne muszą być liczbami całkowitymi.")
+        print("Błąd: Wprowadzono niepoprawne współrzędne.")
         sys.exit(1)
         
     start = (start_r, start_c)
     end = (end_r, end_c)
     
-    path, steps = solve_maze(grid, start, end, algorithm)
+    print("\nStart za 1 sekundę...")
+    time.sleep(1)
     
-    if path:
-        print(f"\n[SUKCES] Znaleziono ścieżkę między wybranymi polami[cite: 1]!")
-        print(f"Liczba wykonanych kroków (odwiedzonych węzłów): {steps}[cite: 1]")
-        print(f"Długość znalezionej ścieżki: {len(path)} kroków.")
+    found, steps, path = solve_maze(grid, start, end, algo)
+    
+    print("\n" + "="*45)
+    if found:
+        print(f" [SUKCES] Znaleziono ścieżkę!")
+        print(f" Liczba wykonanych kroków (odwiedzonych węzłów): {steps}")
+        print(f" Długość znalezionej ścieżki: {len(path)} kroków.")
     else:
-        print(f"\n[BRAK ŚCIEŻKI] Brak ścieżki między wybranymi polami[cite: 1].")
-        print(f"Liczba wykonanych kroków: {steps}[cite: 1]")
+        print(f" [BRAK WYNIKU] Nie udało się znaleźć ścieżki między wybranymi punktami.")
+        print(f" Liczba wykonanych kroków: {steps}")
+    print("="*45)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
