@@ -1,0 +1,256 @@
+{
+  "questions": {
+    "Q1": {
+      "text": "Jaki problem występuje w systemie Linux?",
+      "answers": ["no internet", "slowness", "login problem", "no free space", "permissions", "boot_error"]
+    },
+    "Q2": {
+      "text": "Czy problem pojawił się po aktualizacji systemu?",
+      "answers": ["true", "false"]
+    },
+    "Q3": {
+      "text": "Czy usługa sieciowa (NetworkManager/systemd-networkd) jest uruchomiona?",
+      "answers": ["true", "false"]
+    },
+    "Q4": {
+      "text": "Jaki jest poziom wykorzystania pamięci RAM?",
+      "answers": ["normal", "high", "critical"]
+    },
+    "Q5": {
+      "text": "Czy partycja główna (root /) jest całkowicie pełna (100%)?",
+      "answers": ["true", "false"]
+    },
+    "Q6": {
+      "text": "Czy plik konfiguracyjny lub skrypt ma poprawne uprawnienia wykonania?",
+      "answers": ["true", "false"]
+    },
+    "Q7": {
+      "text": "Czy hasło użytkownika lub klucz SSH zostały niedawno zmienione?",
+      "answers": ["true", "false"]
+    },
+    "Q8": {
+      "text": "Czy system loguje krytyczne błędy jądra (dmesg / kernel panic)?",
+      "answers": ["true", "false"]
+    },
+    "Q9": {
+      "text": "Czy usługa SSH działa poprawnie i akceptuje połączenia?",
+      "answers": ["true", "false"]
+    },
+    "Q10": {
+      "text": "Czy występuje konflikt pakietów w menedżerze apt/yum?",
+      "answers": ["true", "false"]
+    }
+  },
+  "rules": [
+    {
+      "if": {"Q1": "boot_error", "Q2": "true"},
+      "then": {
+        "diagnosis": "Możliwy błąd uruchamiania po aktualizacji jądra",
+        "action": "Uruchom poprzednią wersję jądra systemu w bootloaderze (GRUB)."
+      }
+    },
+    {
+      "if": {"Q1": "boot_error", "Q8": "true"},
+      "then": {
+        "diagnosis": "Krytyczny błąd jądra podczas rozruchu",
+        "action": "Sprawdź logi przez tryb ratunkowy (rescue mode) i napraw uszkodzony system plików."
+      }
+    },
+    {
+      "if": {"Q1": "no internet", "Q3": "false"},
+      "then": {
+        "diagnosis": "Wyłączona usługa sieciowa",
+        "action": "Uruchom ponownie usługę sieciową poleceniem: sudo systemctl restart NetworkManager."
+      }
+    },
+    {
+      "if": {"Q1": "no internet", "Q3": "true"},
+      "then": {
+        "diagnosis": "Problem z konfiguracją IP lub dostawcą internetu",
+        "action": "Sprawdź konfigurację interfejsu poleceniem 'ip a' oraz działanie serwerów DNS."
+      }
+    },
+    {
+      "if": {"Q1": "slowness", "Q4": "high"},
+      "then": {
+        "diagnosis": "Wysokie zużycie pamięci RAM powodujące spowolnienie",
+        "action": "Sprawdź procesy pożerające pamięć za pomocą polecenia 'htop' lub 'free -h'."
+      }
+    },
+    {
+      "if": {"Q1": "slowness", "Q5": "true"},
+      "then": {
+        "diagnosis": "Brak wolnego miejsca na dysku głównym",
+        "action": "Wyczyść cache menedżera pakietów oraz stare logi w /var/log."
+      }
+    },
+    {
+      "if": {"Q1": "login problem", "Q7": "true"},
+      "then": {
+        "diagnosis": "Problem z uwierzytelnieniem po zmianie danych",
+        "action": "Zweryfikuj poprawność wprowadzanych danych lub zresetuj hasło z poziomu konta root."
+      }
+    },
+    {
+      "if": {"Q1": "login problem", "Q9": "false"},
+      "then": {
+        "diagnosis": "Usługa SSH jest niedostępna lub zablokowana",
+        "action": "Sprawdź status demona SSH: sudo systemctl status sshd."
+      }
+    },
+    {
+      "if": {"Q1": "no free space", "Q5": "true"},
+      "then": {
+        "diagnosis": "Całkowite zapełnienie partycji systemowej",
+        "action": "Usuń zbędne pliki tymczasowe z katalogu /tmp oraz stare obrazy kernela."
+      }
+    },
+    {
+      "if": {"Q1": "permissions", "Q6": "false"},
+      "then": {
+        "diagnosis": "Brak uprawnień do wykonania pliku lub skryptu",
+        "action": "Nadaj odpowiednie uprawnienia poleceniem: chmod +x nazwa_pliku."
+      }
+    },
+    {
+      "if": {"Q2": "true", "Q10": "true"},
+      "then": {
+        "diagnosis": "Konflikt pakietów po aktualizacji systemowej",
+        "action": "Napraw uszkodzone zależności za pomocą 'sudo apt --fix-broken install'."
+      }
+    },
+    {
+      "if": {"Q3": "false", "Q8": "true"},
+      "then": {
+        "diagnosis": "Awaria sprzętowa karty sieciowej lub błąd sterownika",
+        "action": "Sprawdź sterowniki jądra dla kontrolera sieciowego w poleceniu 'dmesg | grep eth'."
+      }
+    },
+    {
+      "if": {"Q4": "critical", "Q5": "true"},
+      "then": {
+        "diagnosis": "Krytyczny stan zasobów systemu (RAM i dysk)",
+        "action": "Natychmiastowo zrestartuj zasobożerne procesy i zwolnij przestrzeń dyskową."
+      }
+    },
+    {
+      "if": {"Q5": "true", "Q6": "false"},
+      "then": {
+        "diagnosis": "Brak miejsca uniemożliwiający zapis uprawnień/konfiguracji",
+        "action": "Zwolnij dysk, aby system mógł poprawnie zapisać metadane plików."
+      }
+    },
+    {
+      "if": {"Q7": "true", "Q9": "false"},
+      "then": {
+        "diagnosis": "Odrzucenie klucza SSH po zmianie konfiguracji dostępu",
+        "action": "Sprawdź uprawnienia do katalogu ~/.ssh oraz pliku authorized_keys (chmod 700/600)."
+      }
+    },
+    {
+      "if": {"Q1": "slowness", "Q2": "true"},
+      "then": {
+        "diagnosis": "Spowolnienie systemu spowodowane nowymi usługami w tle po aktualizacji",
+        "action": "Przejrzyj listę nowo uruchomionych demonów systemd."
+      }
+    },
+    {
+      "if": {"Q1": "no internet", "Q10": "true"},
+      "then": {
+        "diagnosis": "Uszkodzenie stosu sieciowego w wyniku błędnej aktualizacji pakietów",
+        "action": "Przeinstaluj pakiety sieciowe i zresetuj tablicę routingu."
+      }
+    },
+    {
+      "if": {"Q3": "true", "Q9": "true"},
+      "then": {
+        "diagnosis": "Sieć i SSH działają, problem leży w warstwie aplikacji użytkownika",
+        "action": "Przeanalizuj logi dedykowanej aplikacji w katalogu /var/log/."
+      }
+    },
+    {
+      "if": {"Q4": "normal", "Q5": "false"},
+      "then": {
+        "diagnosis": "Zasoby systemowe (RAM i dysk) w normie",
+        "action": "Szukaj źródła problemu w logach specyficznych dla danej usługi."
+      }
+    },
+    {
+      "if": {"Q6": "true", "Q7": "false"},
+      "then": {
+        "diagnosis": "Poprawne uprawnienia, ale nieaktualne dane logowania",
+        "action": "Zweryfikuj poprawność wprowadzanych danych uwierzytelniających."
+      }
+    },
+    {
+      "if": {"Q2": "false", "Q8": "true"},
+      "then": {
+        "diagnosis": "Spontaniczny błąd sprzętowy lub uszkodzenie sektora dysku",
+        "action": "Wykonaj diagnostykę dysku S.M.A.R.T. narzędziem smartctl."
+      }
+    },
+    {
+      "if": {"Q1": "login problem", "Q4": "critical"},
+      "then": {
+        "diagnosis": "Brak wolnych zasobów uniemożliwiający utworzenie sesji użytkownika",
+        "action": "Zaloguj się przez TTY (Ctrl+Alt+F1) i zamknij zawieszone procesy."
+      }
+    },
+    {
+      "if": {"Q3": "false", "Q5": "true"},
+      "then": {
+        "diagnosis": "Brak miejsca uniemożliwiający zapis buforów sieciowych",
+        "action": "Zwolnij dysk, aby usługi sieciowe mogły poprawnie tworzyć pliki tymczasowe."
+      }
+    },
+    {
+      "if": {"Q10": "true", "Q2": "false"},
+      "then": {
+        "diagnosis": "Niespójność bazy pakietów niezwiązana z bezpośrednią aktualizacją",
+        "action": "Wymuś czyszczenie i odświeżenie listy repozytoriów (apt update)."
+      }
+    },
+    {
+      "if": {"Q1": "permissions", "Q9": "false"},
+      "then": {
+        "diagnosis": "Błędy uprawnień kluczowych plików demona SSH",
+        "action": "Napraw uprawnienia do plików konfiguracyjnych w /etc/ssh/."
+      }
+    },
+    {
+      "if": {"Q4": "high", "Q8": "true"},
+      "then": {
+        "diagnosis": "Wyciek pamięci w module jądra systemu",
+        "action": "Zidentyfikuj wadliwy moduł kernela i zaktualizuj sterowniki."
+      }
+    },
+    {
+      "if": {"Q1": "boot_error", "Q5": "true"},
+      "then": {
+        "diagnosis": "Brak miejsca na partycji root uniemożliwiający zapis logów startowych",
+        "action": "Uruchom system w trybie single-user i wyczyść zbędne pliki."
+      }
+    },
+    {
+      "if": {"Q2": "true", "Q3": "false"},
+      "then": {
+        "diagnosis": "Zmiana schematu nazw interfejsów sieciowych po aktualizacji udev",
+        "action": "Sprawdź aktualne nazwy interfejsów poleceniem 'ip link' i zaktualizuj konfigurację."
+      }
+    },
+    {
+      "if": {"Q1": "slowness", "Q9": "false"},
+      "then": {
+        "diagnosis": "Przeciążenie systemu powodujące timeouty usług sieciowych",
+        "action": "Zoptymalizuj obciążenie procesora i pamięci RAM."
+      }
+    },
+    {
+      "if": {"Q6": "false", "Q10": "true"},
+      "then": {
+        "diagnosis": "Błędy uprawnień skryptów instalacyjnych pakietów",
+        "action": "Nadaj poprawne prawa dostępu do skryptów post-instalacyjnych menedżera pakietów."
+      }
+    }
+  ]
+}
